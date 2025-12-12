@@ -84,14 +84,14 @@ const handleFile = (file) => {
 
     // Warning for large files
     const largeFileWarning = document.getElementById('large-file-warning');
-    if (sizeMB > 200) {
+    if (sizeMB > 400) {
         if (!largeFileWarning) {
             const warningMsg = document.createElement('div');
             warningMsg.id = 'large-file-warning';
             warningMsg.style.color = '#e74c3c';
             warningMsg.style.marginTop = '10px';
             warningMsg.style.fontWeight = 'bold';
-            warningMsg.textContent = 'Warning: Files larger than 200MB may cause the browser to crash due to memory limits.';
+            warningMsg.textContent = 'Warning: Files larger than 400MB may cause the browser to crash due to memory limits.';
             uploadArea.appendChild(warningMsg);
         }
     } else {
@@ -125,8 +125,9 @@ convertBtn.addEventListener('click', async () => {
 
         // FFmpeg command: -i input -vn -b:a bitrate output.mp3
         // -vn: Disable video recording (ignore album art which can be video stream)
-        // -map 0:a:0? Simple -vn is usually enough to strip video.
-        await ffmpeg.exec(['-i', inputName, '-vn', '-b:a', bitrate, outputName]);
+        // -threads 0: Let FFmpeg choose optimal threads (usually good for core-mt)
+        // -nostdin: Disable interaction
+        await ffmpeg.exec(['-i', inputName, '-vn', '-b:a', bitrate, '-threads', '0', '-nostdin', outputName]);
 
         log('Conversion finished. Reading output file...');
         const data = await ffmpeg.readFile(outputName);
