@@ -11,23 +11,40 @@ const convertBtn = document.getElementById('convert-btn');
 const statusDiv = document.getElementById('status');
 const resultDiv = document.getElementById('result');
 const compressionLevelSelect = document.getElementById('compression-level');
+const logPre = document.getElementById('log');
+
+const log = (message) => {
+    console.log(message);
+    logPre.style.display = 'block';
+    logPre.textContent += message + '\n';
+    logPre.scrollTop = logPre.scrollHeight;
+};
 
 // Initialize FFmpeg
 const initFFmpeg = async () => {
     try {
         statusDiv.textContent = 'Loading FFmpeg...';
-        const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
+        // Use standard core (single threaded) for broader compatibility and less header issues
+        const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/esm';
+
         await ffmpeg.load({
             coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
             wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+            workerURL: await toBlobURL(`${baseURL}/ffmpeg-core.worker.js`, 'text/javascript'),
         });
+
         statusDiv.textContent = 'FFmpeg loaded. Ready.';
-        console.log('FFmpeg loaded');
+        log('FFmpeg loaded successfully.');
     } catch (error) {
         console.error('Error loading FFmpeg:', error);
-        statusDiv.textContent = 'Error loading FFmpeg. Please check console.';
+        statusDiv.innerHTML = `Error loading FFmpeg: ${error.message}<br><small>See log for details</small>`;
+        log(error.stack || error.message);
     }
 };
+
+ffmpeg.on('log', ({ message }) => {
+    log(message);
+});
 
 initFFmpeg();
 
@@ -65,6 +82,8 @@ const handleFile = (file) => {
     fileInfo.textContent = `Selected: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
     convertBtn.disabled = false;
     resultDiv.innerHTML = ''; // Clear previous results
+    logPre.textContent = ''; // Clear logs
+    log(`File selected: ${file.name}`);
 };
 
 convertBtn.addEventListener('click', async () => {
@@ -78,15 +97,18 @@ convertBtn.addEventListener('click', async () => {
         const inputName = 'input' + getExtension(inputFile.name);
         const outputName = 'output.mp3';
 
+        log(`Writing file: ${inputName}`);
         await ffmpeg.writeFile(inputName, await fetchFile(inputFile));
 
         const bitrate = getBitrate(compressionLevelSelect.value);
-        console.log(`Starting conversion: ${inputName} -> ${outputName} with bitrate ${bitrate}`);
+        log(`Starting conversion: ${inputName} -> ${outputName} with bitrate ${bitrate}`);
 
-        // FFmpeg command: -i input -b:a bitrate output.mp3
-        // We can also add -map a to ensure only audio is processed if input has video/cover art
-        await ffmpeg.exec(['-i', inputName, '-b:a', bitrate, outputName]);
+        // FFmpeg command: -i input -vn -b:a bitrate output.mp3
+        // -vn: Disable video recording (ignore album art which can be video stream)
+        // -map 0:a:0? Simple -vn is usually enough to strip video.
+        await ffmpeg.exec(['-i', inputName, '-vn', '-b:a', bitrate, outputName]);
 
+        log('Conversion finished. Reading output file...');
         const data = await ffmpeg.readFile(outputName);
 
         const blob = new Blob([data.buffer], { type: 'audio/mp3' });
@@ -103,16 +125,14 @@ convertBtn.addEventListener('click', async () => {
 
         resultDiv.appendChild(downloadLink);
 
-        // Cleanup
-        /*
-           Note: In a long running app, we might want to delete files from MEMFS.
-           await ffmpeg.deleteFile(inputName);
-           await ffmpeg.deleteFile(outputName);
-        */
+        // Cleanup?
+        // await ffmpeg.deleteFile(inputName);
+        // await ffmpeg.deleteFile(outputName);
 
     } catch (error) {
         console.error('Conversion error:', error);
-        statusDiv.textContent = 'Error during conversion. See console for details.';
+        statusDiv.innerHTML = `Error during conversion: ${error.message}`;
+        log(`Error stack: ${error.stack}`);
     } finally {
         convertBtn.disabled = false;
     }
@@ -132,10 +152,3 @@ const getBitrate = (level) => {
         default: return '128k';
     }
 };
-
-// Logger for progress (optional but good for UX)
-ffmpeg.on('log', ({ message }) => {
-    console.log(message);
-    // Simple progress heuristic could be added here if needed,
-    // but parsing ffmpeg logs is complex.
-});
