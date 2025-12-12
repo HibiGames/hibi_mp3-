@@ -23,9 +23,9 @@ const log = (message) => {
 // Initialize FFmpeg
 const initFFmpeg = async () => {
     try {
-        statusDiv.textContent = 'Loading FFmpeg...';
-        // Use standard core (single threaded) for broader compatibility and less header issues
-        const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/esm';
+        statusDiv.textContent = 'Loading FFmpeg (Multi-threaded)...';
+        // Use multi-threaded core for better performance
+        const baseURL = 'https://unpkg.com/@ffmpeg/core-mt@0.12.10/dist/esm';
 
         await ffmpeg.load({
             coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
@@ -33,8 +33,8 @@ const initFFmpeg = async () => {
             workerURL: await toBlobURL(`${baseURL}/ffmpeg-core.worker.js`, 'text/javascript'),
         });
 
-        statusDiv.textContent = 'FFmpeg loaded. Ready.';
-        log('FFmpeg loaded successfully.');
+        statusDiv.textContent = 'FFmpeg loaded (MT). Ready.';
+        log('FFmpeg (Multi-threaded) loaded successfully.');
     } catch (error) {
         console.error('Error loading FFmpeg:', error);
         statusDiv.innerHTML = `Error loading FFmpeg: ${error.message}<br><small>See log for details</small>`;
@@ -79,11 +79,31 @@ const handleFile = (file) => {
         return;
     }
     inputFile = file;
-    fileInfo.textContent = `Selected: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+    const sizeMB = file.size / 1024 / 1024;
+    fileInfo.textContent = `Selected: ${file.name} (${sizeMB.toFixed(2)} MB)`;
+
+    // Warning for large files
+    const largeFileWarning = document.getElementById('large-file-warning');
+    if (sizeMB > 200) {
+        if (!largeFileWarning) {
+            const warningMsg = document.createElement('div');
+            warningMsg.id = 'large-file-warning';
+            warningMsg.style.color = '#e74c3c';
+            warningMsg.style.marginTop = '10px';
+            warningMsg.style.fontWeight = 'bold';
+            warningMsg.textContent = 'Warning: Files larger than 200MB may cause the browser to crash due to memory limits.';
+            uploadArea.appendChild(warningMsg);
+        }
+    } else {
+        if (largeFileWarning) {
+            largeFileWarning.remove();
+        }
+    }
+
     convertBtn.disabled = false;
     resultDiv.innerHTML = ''; // Clear previous results
     logPre.textContent = ''; // Clear logs
-    log(`File selected: ${file.name}`);
+    log(`File selected: ${file.name} (${sizeMB.toFixed(2)} MB)`);
 };
 
 convertBtn.addEventListener('click', async () => {
@@ -133,6 +153,10 @@ convertBtn.addEventListener('click', async () => {
         console.error('Conversion error:', error);
         statusDiv.innerHTML = `Error during conversion: ${error.message}`;
         log(`Error stack: ${error.stack}`);
+
+        if (error.message && (error.message.includes('memory') || error.message.includes('allocation'))) {
+             statusDiv.innerHTML += '<br><br><strong>Suggestion:</strong> The file might be too large for the browser memory. Try a smaller file.';
+        }
     } finally {
         convertBtn.disabled = false;
     }
