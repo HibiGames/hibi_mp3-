@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Compressor</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Audio Compressor</h1>
+        <p>音声ファイルのデータ量をブラウザ上で削減します。</p>
+
+        <div id="upload-area" class="upload-area">
+            <p>ここにファイルをドラッグ＆ドロップ<br>または</p>
+            <input type="file" id="file-input" accept="audio/*">
+            <label for="file-input" class="file-label">ファイルを選択</label>
+            <div id="file-info"></div>
+        </div>
+
+        <div class="controls">
+            <label for="compression-level">圧縮設定:</label>
+            <select id="compression-level">
+                <option value="high">高音質 (192kbps)</option>
+                <option value="balanced" selected>バランス (128kbps)</option>
+                <option value="low">低容量 (64kbps)</option>
+                <option value="very-low">超低容量 (32kbps)</option>
+            </select>
+        </div>
+
+        <button id="convert-btn" disabled>圧縮開始</button>
+
+        <div id="status"></div>
+        <div id="result"></div>
+    </div>
+
+    <script src="coi-serviceworker.js"></script>
+    <script type="module" src="script.js"></script>
+</body>
+</html>
